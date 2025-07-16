@@ -84,6 +84,11 @@ class BatchProcessor(Generic[T]):
         if metadata is None:
             metadata = {"description": "Instructor batch job"}
 
+        if self.provider_name == "mistral":
+            # Mistral batch API call needs model and endpoint arguments.
+            kwargs["model_name"] = self.model_name
+            kwargs["endpoint"] = "/v1/chat/completions"
+
         return self.provider.submit_batch(file_path, metadata=metadata, **kwargs)
 
     def get_batch_status(self, batch_id: str) -> dict[str, Any]:
@@ -260,6 +265,11 @@ class BatchProcessor(Generic[T]):
                                     continue
 
                 return None
+
+            if self.provider_name == "mistral":
+                # Mistral JSON schema response
+                content = data["response"]["body"]["choices"][0]["message"]["content"]
+                return json.loads(content)
 
         except Exception:
             return None

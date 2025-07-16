@@ -288,6 +288,99 @@ class BatchJobInfo(BaseModel):
             raw_data=batch_data,
         )
 
+    @classmethod
+    def from_mistral(cls, batch_data: dict[str, Any]) -> BatchJobInfo:
+        """Create from OpenAI batch response"""
+        # Normalize status
+        status_map = {
+            "QUEUED": BatchStatus.PENDING,
+            "RUNNING": BatchStatus.PROCESSING,
+            "RINNING": BatchStatus.PROCESSING,
+            "SUCCESS": BatchStatus.COMPLETED,
+            "FAILED": BatchStatus.FAILED,
+            "TIMEOUT_EXCEEDED": BatchStatus.EXPIRED,
+            "CANCELLED": BatchStatus.CANCELLED,
+            "CANCELLATION_REQUESTED": BatchStatus.CANCELLED,
+        }
+
+        # Parse timestamps
+        timestamps = BatchTimestamps(
+            created_at=(
+                datetime.fromtimestamp(batch_data["created_at"], tz=timezone.utc)
+                if batch_data.get("created_at")
+                else None
+            ),
+            started_at=(
+                datetime.fromtimestamp(batch_data["started_at"], tz=timezone.utc)
+                if batch_data.get("in_progress_at")
+                else None
+            ),
+            completed_at=(
+                datetime.fromtimestamp(batch_data["completed_at"], tz=timezone.utc)
+                if batch_data.get("completed_at")
+                else None
+            ),
+            failed_at=(
+                datetime.fromtimestamp(batch_data["failed_at"], tz=timezone.utc)
+                if batch_data.get("failed_at") # Not present for Mistral
+                else None
+            ),
+            cancelled_at=(
+                datetime.fromtimestamp(batch_data["cancelled_at"], tz=timezone.utc)
+                if batch_data.get("cancelled_at") # Not present for Mistral
+                else None
+            ),
+            expired_at=(
+                datetime.fromtimestamp(batch_data["expired_at"], tz=timezone.utc)
+                if batch_data.get("expired_at") # Not present for Mistral
+                else None
+            ),
+            expires_at=(
+                datetime.fromtimestamp(batch_data["expires_at"], tz=timezone.utc)
+                if batch_data.get("expires_at") # Not present for Mistral
+                else None
+            ),
+        )
+
+        # Parse request counts
+        request_counts = BatchRequestCounts(
+            total=getattr(batch_data, "total_requests"),
+            completed=getattr(batch_data, "sacceeded_requests"),
+            failed=getattr(batch_data, "failed_requests")
+        )
+
+        # Parse files
+        files = BatchFiles(
+            input_file_id=batch_data.get("input_files")[0], # for mistral: list of files, get index 0.
+            output_file_id=batch_data.get("output_file"),
+            error_file_id=batch_data.get("error_file"),
+        )
+
+        # Parse error information
+        error = None
+        if batch_data.get("errors"):
+            error_data = batch_data["errors"]
+            error = BatchErrorInfo(
+                error_type=error_data.get("type"),
+                error_message=error_data.get("message"),
+                error_code=error_data.get("code"),
+            )
+
+        return cls(
+            id=batch_data["id"],
+            provider="mistral",
+            status=status_map.get(batch_data["status"], BatchStatus.PENDING),
+            raw_status=batch_data["status"],
+            timestamps=timestamps,
+            request_counts=request_counts,
+            files=files,
+            error=error,
+            metadata=batch_data.get("metadata", {}),
+            raw_data=batch_data,
+            endpoint=batch_data.get("endpoint"),
+            model=batch_data.get("model"),
+        )
+
 
 # Union type for batch results - like a Maybe/Result type
 BatchResult = Union[BatchSuccess[T], BatchError]
