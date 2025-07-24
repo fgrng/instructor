@@ -110,6 +110,17 @@ def generate_table(batch_jobs: list[BatchJobInfo], provider: str):
                 str(batch_job.request_counts.errored or 0),
                 str(batch_job.request_counts.processing or 0),
             )
+        elif provider == "mistral":
+            table.add_row(
+                batch_id_display,
+                colored_status,
+                created_str,
+                started_str,
+                duration_str,
+                str(batch_job.request_counts.completed or 0),
+                str(batch_job.request_counts.failed or 0),
+                str(batch_job.request_counts.total or 0),
+            )
 
     return table
 
@@ -122,6 +133,7 @@ def get_jobs(limit: int = 10, provider: str = "openai") -> list[BatchJobInfo]:
     model_map = {
         "openai": "openai/gpt-4o-mini",
         "anthropic": "anthropic/claude-3-sonnet",
+        "mistral": "mistral/ministral-8b-latest",
     }
 
     if provider not in model_map:
@@ -180,6 +192,7 @@ def watch(
     required_keys = {
         "anthropic": "ANTHROPIC_API_KEY",
         "openai": "OPENAI_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
     }
 
     if provider in required_keys and not os.getenv(required_keys[provider]):
@@ -408,6 +421,13 @@ def download_file(
             with open(download_file_path, "w") as file:
                 for result in tqdm(client.messages.batches.results(batch_id)):
                     file.write(json.dumps(result.model_dump()) + "\n")
+        elif provider == "mistral":
+            ## TODO
+            from mistralai import Mistral
+
+            client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+            batch = client.batch.jobs.get(job_id=batch_id)
+            status = batch.status
         else:
             from openai import OpenAI
 

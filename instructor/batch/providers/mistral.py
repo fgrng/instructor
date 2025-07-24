@@ -189,7 +189,7 @@ class MistralProvider(BatchProvider):
         """List OpenAI batch jobs"""
         try:
             import os
-            from mistral import Mistral
+            from mistralai import Mistral
 
             if os.environ.get("MISTRAL_API_KEY"):
                 client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
@@ -200,8 +200,13 @@ class MistralProvider(BatchProvider):
                 )
             
             batches = client.batch.jobs.list(page_size=limit)
+
+            def default_handler(model_instance):
+                ## assume every model provides Pydantic’s JSON‐mode dump
+                return model_instance.model_dump(mode="json")
+            
             return [
-                BatchJobInfo.from_mistral(batch.serialize_model()) for batch in batches.data
+                BatchJobInfo.from_mistral(batch.serialize_model(default_handler)) for batch in batches.data
             ]
         except Exception as e:
             raise Exception(f"Failed to list Mistral batches: {e}") from e

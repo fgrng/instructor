@@ -344,11 +344,12 @@ class BatchJobInfo(BaseModel):
 
         # Parse request counts
         request_counts = BatchRequestCounts(
-            total=getattr(batch_data, "total_requests"),
-            completed=getattr(batch_data, "sacceeded_requests"),
-            failed=getattr(batch_data, "failed_requests")
+            total=batch_data.get("total_requests"),
+            completed=batch_data.get("completed_requests"),
+            succeeded=batch_data.get("succeeded_requests"),
+            failed=batch_data.get("failed_requests")
         )
-
+        
         # Parse files
         files = BatchFiles(
             input_file_id=batch_data.get("input_files")[0], # for mistral: list of files, get index 0.
